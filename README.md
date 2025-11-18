@@ -67,7 +67,7 @@ cp .env.example .env
 SLACK_BOT_TOKEN=xoxb-your-bot-token
 SLACK_SIGNING_SECRET=your-signing-secret
 SLACK_APP_TOKEN=xapp-your-app-token
-WALLETCONNECT_PROJECT_ID=your-walletconnect-project-id
+WALLETCONNECT_PROJECT_ID=2aa1ada37fe9104d361674b337a37fe3
 ```
 
 ### 6. 빌드 및 실행
@@ -147,11 +147,17 @@ slack-walletconnect-bot/
 
 ## 지원하는 블록체인
 
-현재 Ethereum (EIP-155) 체인을 지원합니다:
-- Ethereum Mainnet
-- 기타 EVM 호환 체인
+다음 블록체인 네트워크를 지원합니다:
 
-추가 체인 지원이 필요한 경우 `src/walletconnect.ts`의 `requiredNamespaces`를 수정하세요.
+### EVM 호환 체인 (EIP-155)
+- **Ethereum Mainnet** (Chain ID: 1)
+- **BSC (Binance Smart Chain)** (Chain ID: 56)
+- **Kaia** (Chain ID: 8217)
+
+### 기타 체인
+- **Tron** (Chain ID: 0x2b6653dc / 728126428)
+
+모든 체인은 선택적으로 지원되므로(optionalNamespaces), 지갑이 일부 체인만 지원하더라도 연결이 가능합니다. 추가 체인 지원이 필요한 경우 `src/walletconnect.ts`의 `SUPPORTED_CHAINS`와 `createConnection` 메서드를 수정하세요.
 
 ## 보안 고려사항
 

@@ -1,6 +1,6 @@
 import { App } from '@slack/bolt';
 import { config } from './config';
-import { WalletConnectManager } from './walletconnect';
+import { WalletConnectManager, SUPPORTED_CHAINS } from './walletconnect';
 import { generateQRCodeDataURL } from './qr-generator';
 
 export class SlackBot {
@@ -45,7 +45,7 @@ export class SlackBot {
           file: buffer,
           filename: 'walletconnect-qr.png',
           title: 'WalletConnect QR Code',
-          initial_comment: `🔗 *지갑을 연결하세요!*\n\nWalletConnect 앱에서 QR 코드를 스캔하거나 아래 URI를 사용하세요:\n\`\`\`${uri}\`\`\`\n\n⏳ 연결을 기다리는 중...`,
+          initial_comment: `🔗 *지갑을 연결하세요!*\n\n지원하는 체인: Ethereum, BSC, Kaia, Tron\n\nWalletConnect 앱에서 QR 코드를 스캔하거나 아래 URI를 사용하세요:\n\`\`\`${uri}\`\`\`\n\n⏳ 연결을 기다리는 중...`,
         });
 
         // 연결 대기 (비동기)
@@ -69,8 +69,13 @@ export class SlackBot {
         }
 
         const sessionList = sessions.map((session, index) => {
-          const account = session.namespaces.eip155?.accounts[0] || 'Unknown';
-          return `${index + 1}. Topic: \`${session.topic.substring(0, 16)}...\`\n   Account: \`${account}\``;
+          const accounts = this.wcManager.getSessionAccounts(session);
+          const accountInfo = accounts.map((acc) => {
+            const chainName = this.getChainName(acc.namespace, acc.chainId);
+            return `   • ${chainName}: \`${acc.address}\``;
+          }).join('\n');
+
+          return `${index + 1}. Session ID: \`${session.topic.substring(0, 16)}...\`\n${accountInfo}`;
         }).join('\n\n');
 
         await say(`📋 *활성 세션 목록*\n\n${sessionList}`);
@@ -118,18 +123,21 @@ export class SlackBot {
 
         const message = command.text || 'Hello from Slack WalletConnect Bot!';
         const session = sessions[0];
-        const account = session.namespaces.eip155?.accounts[0]?.split(':')[2];
+        const accounts = this.wcManager.getSessionAccounts(session);
 
-        if (!account) {
+        if (accounts.length === 0) {
           await say('계정 정보를 찾을 수 없습니다.');
           return;
         }
 
-        await say(`🔏 메시지를 서명하는 중...\nMessage: "${message}"`);
+        const account = accounts[0];
+        const chainName = this.getChainName(account.namespace, account.chainId);
 
-        const signature = await this.wcManager.signMessage(session.topic, message, account);
+        await say(`🔏 메시지를 서명하는 중...\nChain: ${chainName}\nMessage: "${message}"`);
 
-        await say(`✅ *서명 완료!*\n\nSignature:\n\`\`\`${signature}\`\`\``);
+        const signature = await this.wcManager.signMessage(session.topic, message, account.address);
+
+        await say(`✅ *서명 완료!*\n\nChain: ${chainName}\nAddress: \`${account.address}\`\nSignature:\n\`\`\`${signature}\`\`\``);
       } catch (error: any) {
         console.error('Sign command error:', error);
         await say(`❌ 오류가 발생했습니다: ${error.message}`);
@@ -142,6 +150,12 @@ export class SlackBot {
 
       const helpText = `
 *🤖 WalletConnect Bot 도움말*
+
+*지원하는 체인:*
+• Ethereum (ETH) - Chain ID: 1
+• BSC (BNB) - Chain ID: 56
+• Kaia (KAIA) - Chain ID: 8217
+• Tron (TRX) - Chain ID: 0x2b6653dc
 
 *사용 가능한 명령어:*
 
@@ -165,12 +179,16 @@ export class SlackBot {
     try {
       const session = await this.wcManager.waitForConnection(approval);
 
-      const account = session.namespaces.eip155?.accounts[0] || 'Unknown';
+      const accounts = this.wcManager.getSessionAccounts(session);
+      const accountInfo = accounts.map((acc) => {
+        const chainName = this.getChainName(acc.namespace, acc.chainId);
+        return `• ${chainName}: \`${acc.address}\``;
+      }).join('\n');
 
       await this.app.client.chat.postMessage({
         token: config.slack.token,
         channel: channelId,
-        text: `✅ *지갑 연결 성공!*\n\n연결된 계정: \`${account}\`\n세션 ID: \`${session.topic.substring(0, 16)}...\`\n\n이제 \`/sign\` 명령어를 사용하여 메시지를 서명할 수 있습니다.`,
+        text: `✅ *지갑 연결 성공!*\n\n연결된 계정:\n${accountInfo}\n\n세션 ID: \`${session.topic.substring(0, 16)}...\`\n\n이제 \`/sign\` 명령어를 사용하여 메시지를 서명할 수 있습니다.`,
       });
     } catch (error: any) {
       console.error('Approval waiting error:', error);
@@ -180,6 +198,18 @@ export class SlackBot {
         text: `❌ 지갑 연결에 실패했습니다: ${error.message}`,
       });
     }
+  }
+
+  private getChainName(namespace: string, chainId: string): string {
+    const chainIdNum = parseInt(chainId, 10);
+
+    for (const [, chain] of Object.entries(SUPPORTED_CHAINS)) {
+      if (chain.namespace === namespace && chain.id === chainIdNum) {
+        return `${chain.name} (${chain.symbol})`;
+      }
+    }
+
+    return `${namespace}:${chainId}`;
   }
 
   async start() {

@@ -2,6 +2,14 @@ import SignClient from '@walletconnect/sign-client';
 import { SessionTypes } from '@walletconnect/types';
 import { config } from './config';
 
+// Supported chains configuration
+export const SUPPORTED_CHAINS = {
+  ethereum: { id: 1, namespace: 'eip155', name: 'Ethereum', symbol: 'ETH' },
+  bsc: { id: 56, namespace: 'eip155', name: 'BSC', symbol: 'BNB' },
+  kaia: { id: 8217, namespace: 'eip155', name: 'Kaia', symbol: 'KAIA' },
+  tron: { id: 0x2b6653dc, namespace: 'tron', name: 'Tron', symbol: 'TRX' },
+} as const;
+
 export class WalletConnectManager {
   private client: SignClient | null = null;
   private sessions: Map<string, SessionTypes.Struct> = new Map();
@@ -59,7 +67,7 @@ export class WalletConnectManager {
 
     try {
       const { uri, approval } = await this.client.connect({
-        requiredNamespaces: {
+        optionalNamespaces: {
           eip155: {
             methods: [
               'eth_sendTransaction',
@@ -68,7 +76,16 @@ export class WalletConnectManager {
               'personal_sign',
               'eth_signTypedData',
             ],
-            chains: ['eip155:1'],
+            chains: [
+              `eip155:${SUPPORTED_CHAINS.ethereum.id}`, // Ethereum
+              `eip155:${SUPPORTED_CHAINS.bsc.id}`,      // BSC
+              `eip155:${SUPPORTED_CHAINS.kaia.id}`,     // Kaia
+            ],
+            events: ['chainChanged', 'accountsChanged'],
+          },
+          tron: {
+            methods: ['tron_signTransaction', 'tron_signMessage'],
+            chains: [`tron:0x${SUPPORTED_CHAINS.tron.id.toString(16)}`], // Tron
             events: ['chainChanged', 'accountsChanged'],
           },
         },
@@ -97,6 +114,29 @@ export class WalletConnectManager {
     return Array.from(this.sessions.values());
   }
 
+  // Get all accounts from a session across all namespaces
+  getSessionAccounts(session: SessionTypes.Struct): Array<{ namespace: string; chainId: string; address: string }> {
+    const accounts: Array<{ namespace: string; chainId: string; address: string }> = [];
+
+    Object.entries(session.namespaces).forEach(([namespace, namespaceData]) => {
+      namespaceData.accounts.forEach((account) => {
+        const [ns, chainId, address] = account.split(':');
+        accounts.push({ namespace: ns, chainId, address });
+      });
+    });
+
+    return accounts;
+  }
+
+  // Get the primary chain ID from a session (first account's chain)
+  getPrimaryChainId(session: SessionTypes.Struct): string {
+    const accounts = this.getSessionAccounts(session);
+    if (accounts.length === 0) {
+      return 'eip155:1'; // Default to Ethereum
+    }
+    return `${accounts[0].namespace}:${accounts[0].chainId}`;
+  }
+
   async disconnectSession(topic: string) {
     if (!this.client) {
       throw new Error('WalletConnect client not initialized');
@@ -117,7 +157,7 @@ export class WalletConnectManager {
     }
   }
 
-  async sendTransaction(topic: string, transaction: any) {
+  async sendTransaction(topic: string, transaction: any, chainId?: string) {
     if (!this.client) {
       throw new Error('WalletConnect client not initialized');
     }
@@ -127,13 +167,18 @@ export class WalletConnectManager {
       throw new Error('Session not found');
     }
 
+    const targetChainId = chainId || this.getPrimaryChainId(session);
+    const namespace = targetChainId.split(':')[0];
+
     try {
+      const method = namespace === 'tron' ? 'tron_signTransaction' : 'eth_sendTransaction';
+
       const result = await this.client.request({
         topic,
-        chainId: 'eip155:1',
+        chainId: targetChainId,
         request: {
-          method: 'eth_sendTransaction',
-          params: [transaction],
+          method,
+          params: namespace === 'tron' ? transaction : [transaction],
         },
       });
       return result;
@@ -143,7 +188,7 @@ export class WalletConnectManager {
     }
   }
 
-  async signMessage(topic: string, message: string, address: string) {
+  async signMessage(topic: string, message: string, address: string, chainId?: string) {
     if (!this.client) {
       throw new Error('WalletConnect client not initialized');
     }
@@ -153,13 +198,21 @@ export class WalletConnectManager {
       throw new Error('Session not found');
     }
 
+    const targetChainId = chainId || this.getPrimaryChainId(session);
+    const namespace = targetChainId.split(':')[0];
+
     try {
+      const method = namespace === 'tron' ? 'tron_signMessage' : 'personal_sign';
+      const params = namespace === 'tron'
+        ? { message, address }
+        : [message, address];
+
       const result = await this.client.request({
         topic,
-        chainId: 'eip155:1',
+        chainId: targetChainId,
         request: {
-          method: 'personal_sign',
-          params: [message, address],
+          method,
+          params,
         },
       });
       return result;
