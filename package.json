@@ -1,0 +1,33 @@
+{
+  "name": "slack-walletconnect-bot",
+  "version": "1.0.0",
+  "description": "Slack bot for WalletConnect integration with QR code support",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "slack",
+    "walletconnect",
+    "blockchain",
+    "wallet",
+    "qr-code"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/bolt": "^3.17.1",
+    "@walletconnect/sign-client": "^2.11.0",
+    "dotenv": "^16.3.1",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/qrcode": "^1.5.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
