@@ -9,6 +9,8 @@ Slack에서 WalletConnect를 통해 암호화폐 지갑을 연결하고 상호�
 - ✍️ **메시지 서명**: 연결된 지갑으로 메시지 서명
 - 📋 **세션 관리**: 활성 세션 조회 및 관리
 - 🔌 **연결 해제**: 안전한 세션 종료
+- 🏠 **홈 탭 UI**: 버튼 클릭만으로 모든 기능 사용 가능
+- 💬 **슬래시 커맨드**: 명령어를 통한 빠른 작업 수행
 
 ## 사전 요구사항
 
@@ -36,18 +38,23 @@ npm install
 
 1. [Slack API](https://api.slack.com/apps)에 접속하여 새 앱 생성
 2. **Socket Mode** 활성화
-3. **OAuth & Permissions**에서 다음 권한 추가:
+3. **App Home** 설정:
+   - Home Tab 활성화
+   - Messages Tab 활성화 (선택사항)
+4. **OAuth & Permissions**에서 다음 권한 추가:
    - `chat:write`
    - `commands`
    - `files:write`
-4. **Slash Commands** 생성:
+5. **Slash Commands** 생성:
    - `/connect` - 지갑 연결
    - `/sessions` - 세션 조회
    - `/disconnect` - 연결 해제
    - `/sign` - 메시지 서명
    - `/help` - 도움말
-5. **App-Level Token** 생성 (`connections:write` 권한)
-6. 워크스페이스에 앱 설치
+6. **App-Level Token** 생성 (`connections:write` 권한)
+7. **Event Subscriptions** 활성화 및 이벤트 추가:
+   - `app_home_opened` - 홈 탭이 열릴 때
+8. 워크스페이스에 앱 설치
 
 ### 4. WalletConnect Project ID 획득
 
@@ -85,7 +92,18 @@ npm run dev
 
 ## 사용 방법
 
-### 1. 지갑 연결
+### 홈 탭 사용 (추천)
+
+1. Slack의 사이드바에서 앱을 클릭하여 홈 탭을 엽니다
+2. 홈 탭에서 버튼을 클릭하여 작업을 수행할 수 있습니다:
+   - **🔗 지갑 연결**: WalletConnect를 통해 지갑 연결
+   - **📋 세션 조회**: 활성화된 세션 목록 조회
+   - **✍️ 메시지 서명**: 모달을 열어 메시지 입력 후 서명
+   - **🔌 연결 해제**: 모든 세션 연결 해제
+
+### 슬래시 커맨드 사용
+
+#### 1. 지갑 연결
 
 Slack에서 `/connect` 명령어를 입력하면 QR 코드가 표시됩니다.
 
@@ -95,7 +113,7 @@ Slack에서 `/connect` 명령어를 입력하면 QR 코드가 표시됩니다.
 
 WalletConnect를 지원하는 지갑 앱(MetaMask, Trust Wallet 등)에서 QR 코드를 스캔하면 연결이 완료됩니다.
 
-### 2. 활성 세션 조회
+#### 2. 활성 세션 조회
 
 ```
 /sessions
@@ -103,7 +121,7 @@ WalletConnect를 지원하는 지갑 앱(MetaMask, Trust Wallet 등)에서 QR �
 
 현재 연결된 지갑 세션 목록을 확인할 수 있습니다.
 
-### 3. 메시지 서명
+#### 3. 메시지 서명
 
 ```
 /sign Hello World!
@@ -111,7 +129,7 @@ WalletConnect를 지원하는 지갑 앱(MetaMask, Trust Wallet 등)에서 QR �
 
 연결된 지갑으로 메시지를 서명합니다. 메시지를 지정하지 않으면 기본 메시지가 서명됩니다.
 
-### 4. 연결 해제
+#### 4. 연결 해제
 
 ```
 /disconnect
@@ -119,7 +137,7 @@ WalletConnect를 지원하는 지갑 앱(MetaMask, Trust Wallet 등)에서 QR �
 
 모든 활성 세션의 연결을 해제합니다.
 
-### 5. 도움말
+#### 5. 도움말
 
 ```
 /help
